@@ -1,0 +1,23 @@
+{
+  "name": "playwright",
+  "version": "1.0.0",
+  "description": "Тесты на Playwright для ВИтех",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AnastasiaTest21/playwright.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/AnastasiaTest21/playwright/issues"
+  },
+  "homepage": "https://github.com/AnastasiaTest21/playwright#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.22.2"
+  }
+}
