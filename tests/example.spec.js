@@ -1,8 +1,9 @@
-const { test, expect } = require('@playwright/test');
+const {test, expect, chromium} = require('@playwright/test');
 
-test.use({ viewport: {  width: 1820, height: 1070 }});
-
-test('Order self cach', async ({ page }) => {
+test('Order self cach', async ({}) => {
+    const browser = await chromium.launch();
+    const context = await browser.newContext();
+    const page = await context.newPage()
     await page.goto('https://www.vseinstrumenti.ru/represent/change/?represent_id=1&represent_type=common&url_to_redirect=https://www.vseinstrumenti.ru/&regionAutocomplete=');
     await page.goto('https://www.vseinstrumenti.ru/pcabinet/registration/');
     await page.waitForSelector('[data-tab-name="email"]');
@@ -14,11 +15,16 @@ test('Order self cach', async ({ page }) => {
     await page.click('#login-btn');
     const title = page.locator('[data-qa="user"]');
     await expect(title).toHaveText('Здравствуйте, Тест');
+    // Очищаем корзину
+    // await page.goto('https://www.vseinstrumenti.ru/cart/');
+    // await page.waitForSelector('[data-behavior="cart-product-delete"]');
+    // await page.click('[data-behavior="cart-product-delete"]');
+    // await page.waitForSelector('[data-behavior="cart-product-restore"]');
 
-    await page.goto('https://www.vseinstrumenti.ru/instrument/shurupoverty/akkumulyatornye-dreli/');
+    await page.goto('https://www.vseinstrumenti.ru/instrument/shlifmashiny/bolgarka_ushm/');
     // Клик на первую кнопку "В корзину"
-    await page.waitForSelector('[data-behavior="add-to-cart"]');
-    await page.click('[data-behavior="add-to-cart"]', 1);
+    await page.waitForSelector('.buttons [data-behavior="add-to-cart"]');
+    await page.click('.buttons [data-behavior="add-to-cart"]');
     await page.waitForSelector('[data-behavior="go-to-cart"]');
     await page.click('[data-behavior="go-to-cart"]');
     await expect(page.locator('[data-behavior="cart-title"]')).toHaveText('Корзина');
@@ -50,4 +56,79 @@ test('Order self cach', async ({ page }) => {
     // Получение адреса в блоке ИТОГО
     const deliveryAddressLoc = await page.waitForSelector('[data-qa="checkout-total-delivery"] span');
     let deliveryAddress = await deliveryAddressLoc.evaluate(el => el.textContent);
+
+    // Ассерты
+    await expect(price).toEqual(totalSum);
+    await expect(pvzName).toEqual(deliveryAddress);
+    //Выбор спопоба оплаты Наличными
+    await page.waitForSelector('[data-qa="ordering-payment-type-cash"]');
+    await page.click('[data-qa="ordering-payment-type-cash"]');
+    //Проверка отображения выбранного способа оплаты в блоке ИТОГО
+    await page.waitForFunction(
+        'document.querySelector("[data-qa=\'checkout-total-payment\'] span").innerText.includes("Наличными")'
+    );
+    //Проверка отображения ФИО покупателя
+    await page.waitForFunction(
+        'document.querySelector("[data-qa=\'checkout-contractor-select\']").innerText.includes("Тест Тестов")'
+    );
+    //Подтвеждение заказа
+    await page.waitForSelector('[data-qa="ordering-total-order-create-button"]');
+    await page.click('[data-qa="ordering-total-order-create-button"]');
+    //Получение номера заказа на ThankYouPage
+    const orderNumberLoc = await page.waitForSelector('[data-qa="thanks-page-order-number"]');
+    let orderNumberRaw = await orderNumberLoc.evaluate(el => el.textContent);
+    let orderNumber = (orderNumberRaw.replace(/(\r\n|\n|\r)/gm, '')).trim();
+    // Получение данных с текущей датой
+    let date = new Date;
+    let month = "0" + (date.getMonth() + 1);
+    let fullYear = date.getFullYear();
+    let year = fullYear.toString().slice(-2);
+    // Составление шаблона номера заказа (регулярки) с актуальным месяцем и годом
+    let pattern = '№' + year + month + '-' + '2' + '[0-9]{5}-[0-9]{5}';
+    // Поиск совпадений
+    let matches = await orderNumber.match(pattern)
+    await expect(matches.length).toEqual(1);
+    // Проверка отображения кнопки онлайн-оплаты
+    await page.waitForSelector('[data-qa="thanks-page-pay-online"]');
+    // Проверка отображения суммы заказа на ThankYouPage в блоке ИТОГО
+    const sumBlockLocOnTYP = await page.waitForSelector('[data-qa="thanks-total-price"]');
+    let sumRaw = await sumBlockLocOnTYP.evaluate(el => el.textContent);
+    let sumOnTYP = sumRaw.replace(/\D/g, '');
+    await expect(sumOnTYP).toEqual(price);
+    // Проверка отображения суммы заказа на ThankYouPage в строке после "Спасибо за заказ"
+    const sumStringLocOnTYP = await page.waitForSelector('[data-qa="thanks-page-price"]');
+    let sumStringRaw = await sumStringLocOnTYP.evaluate(el => el.textContent);
+    let sumStringOnTYP = sumStringRaw.replace(/\D/g, '');
+    await expect(sumStringOnTYP).toEqual(price);
+
+    // Клик на ссылку с номером заказа с последующим редиректом в ЛК
+    await page.waitForSelector('[data-qa="thanks-page-order-number"]');
+
+    // Создание объекта страницы в появившейся после редиректа вкладке
+    const [newPage] = await Promise.all([
+        context.waitForEvent('page'),
+        page.click('[data-qa="thanks-page-order-number"]'),
+    ])
+    await newPage.waitForLoadState();
+
+    // Проверка отображения номера созданного заказа в ЛК
+    const orderNumberInLKLoc = await newPage.waitForSelector('[data-qa="order-card"]:nth-child(1) [data-qa="number"]');
+    let orderNumberInLK = await orderNumberInLKLoc.evaluate(el => el.textContent);
+    await expect(orderNumberInLK).not.toEqual('0000-000000-00000');
+    // Проверка наличия id созданного заказа в ЛК
+    await newPage.waitForSelector('[data-qa="order-card"]:nth-child(1)');
+    let orderIdInLK = await newPage.evaluate(() => document.querySelector('[data-qa="order-card"]:nth-child(1)').getAttribute("data-order-id"));
+    await expect(orderIdInLK).not.toEqual('');
+    // Проверка отображения статуса созданного заказа в ЛК
+    const orderStatusInLKLoc = await newPage.waitForSelector('[data-qa="order-card"]:nth-child(1) [data-qa="status"]');
+    let orderStatusInLKRaw = await orderStatusInLKLoc.evaluate(el => el.textContent);
+    let orderStatusInLk = orderStatusInLKRaw.trim();
+    await expect(orderStatusInLk).toEqual('В обработке');
+    // Проверка отображения ПВЗ для созданного заказа в ЛК
+    const pvzInfoLoc = await newPage.waitForSelector('[data-qa="order-card"]:nth-child(1) [data-qa="delivery-address"]');
+    let pvzInfoInLKRaw = await pvzInfoLoc.evaluate(el => el.textContent);
+    let pvzInfoInLK = pvzInfoInLKRaw.trim();
+    let expectedPvzFromOrder = "Самовывоз из офиса: " + pvzName + "";
+    let isPvzNameSame = expectedPvzFromOrder.includes(pvzInfoInLK);
+    await expect(isPvzNameSame).toEqual(true);
 });
