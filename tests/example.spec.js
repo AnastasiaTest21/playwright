@@ -16,11 +16,7 @@ test('Order self cach', async ({}) => {
     const title = page.locator('[data-qa="user"]');
     await expect(title).toHaveText('Здравствуйте, Тест');
     // Очищаем корзину
-    // await page.goto('https://www.vseinstrumenti.ru/cart/');
-    // await page.waitForSelector('[data-behavior="cart-product-delete"]');
-    // await page.click('[data-behavior="cart-product-delete"]');
-    // await page.waitForSelector('[data-behavior="cart-product-restore"]');
-
+    await page.goto('https://www.vseinstrumenti.ru/run/PCabinet/MyCart/clearCart');
     await page.goto('https://www.vseinstrumenti.ru/instrument/shlifmashiny/bolgarka_ushm/');
     // Клик на первую кнопку "В корзину"
     await page.waitForSelector('.buttons [data-behavior="add-to-cart"]');
@@ -128,7 +124,6 @@ test('Order self cach', async ({}) => {
     const pvzInfoLoc = await newPage.waitForSelector('[data-qa="order-card"]:nth-child(1) [data-qa="delivery-address"]');
     let pvzInfoInLKRaw = await pvzInfoLoc.evaluate(el => el.textContent);
     let pvzInfoInLK = pvzInfoInLKRaw.trim();
-    let expectedPvzFromOrder = "Самовывоз из офиса: " + pvzName + "";
-    let isPvzNameSame = expectedPvzFromOrder.includes(pvzInfoInLK);
-    await expect(isPvzNameSame).toEqual(true);
+    await expect(pvzInfoInLK).toContain("Самовывоз из офиса: ");
+    await expect(pvzInfoInLK).toContain(pvzName);
 });
